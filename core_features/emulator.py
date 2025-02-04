@@ -3,9 +3,9 @@ import sys
 class HuobzEmulator:
     def __init__(self):
         self.registers = [0] * 16  # 16 general-purpose registers
-        self.memory = ["0000000000000000"] * 65536  # 16-bit addressable memory
+        self.memory = ["0000000000000000"] * 65536  # 64K memory space (initialized with NO-OPs)
         self.pc = 0  # Program Counter
-        self.executed_addresses = set()  # Track executed instructions for infinite loop detection
+        self.executed_addresses = set()  # Track executed instructions for loop detection
 
     def load_program(self, program):
         """Load a program (list of 16-bit binary instructions) into memory."""
@@ -15,18 +15,18 @@ class HuobzEmulator:
     def execute_instruction(self, instruction):
         """Decode and execute a 16-bit instruction."""
         if len(instruction) != 16:
-            print(f"ERROR: Invalid instruction length at PC {self.pc}. Must be 16 bits.")
+            print(f"ERROR: Invalid instruction length {len(instruction)} at PC {self.pc}. Halting execution.")
             return False
-        
+
         opcode = instruction[:4]
         operands = instruction[4:]
 
         def get_register(value):
             reg = int(value, 2)
-            if reg < 0 or reg >= 16:
-                print(f"ERROR: Invalid register index {reg}. Must be between 0-15.")
-                return None
-            return reg
+            if 0 <= reg < 16:
+                return reg
+            print(f"ERROR: Invalid register index {reg}. Must be between 0-15.")
+            return None
 
         if opcode == "0001":  # LOAD
             reg = get_register(operands[:4])
@@ -78,7 +78,7 @@ class HuobzEmulator:
             addr = int(operands, 2)
             if 0 <= addr < len(self.memory):
                 print(f"JMP: Jumping to {addr}")
-                self.pc = addr - 1  # -1 to compensate for PC increment in run()
+                self.pc = addr - 1  # -1 to compensate for increment in run()
             else:
                 print(f"ERROR: Invalid jump address {addr}. Halting execution.")
                 return False
@@ -94,7 +94,7 @@ class HuobzEmulator:
             reg = get_register(operands[:4])
             addr = int(operands[4:], 2)
             if reg is not None and self.registers[reg] != 0:
-                print(f"JMPNZ: Jumping to {addr} because R{reg} ≠ 0")
+                print(f"JMPNZ: Jumping to {addr} because R{reg} = {self.registers[reg]}")
                 self.pc = addr - 1
 
         elif opcode == "1111":  # HALT
@@ -108,7 +108,7 @@ class HuobzEmulator:
         return True
 
     def run(self):
-        """Run the emulator, executing instructions until halted."""
+        """Run the emulator, executing instructions from memory."""
         while self.pc < len(self.memory):
             if self.pc in self.executed_addresses:
                 print(f"ERROR: Infinite loop detected at PC {self.pc}. Halting execution.")
@@ -117,7 +117,7 @@ class HuobzEmulator:
             self.executed_addresses.add(self.pc)
             instruction = self.memory[self.pc]
 
-            if instruction == "0000000000000000":
+            if instruction == "0000000000000000":  # NO-OP
                 print(f"DEBUG: Reached NO-OP at PC {self.pc}. Skipping.")
                 self.pc += 1
                 continue
