@@ -1,2 +1,2 @@
 # HuobzLang
-anguage for resource sharing of CPU, GPU and Storage
+Language for resource sharing of CPU, GPU and Storage
