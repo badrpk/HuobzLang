@@ -108,24 +108,18 @@ class HuobzEmulator:
         return True
 
     def run(self):
-        """Run the emulator, executing instructions from memory."""
-        while self.pc < len(self.memory):
-            if self.pc in self.executed_addresses:
-                print(f"ERROR: Infinite loop detected at PC {self.pc}. Halting execution.")
-                sys.exit(1)
+    """Run the emulator, executing instructions sequentially."""
+    while self.pc < len(self.memory):
+        instruction = self.memory[self.pc]
 
-            self.executed_addresses.add(self.pc)
-            instruction = self.memory[self.pc]
+        if instruction == "0000000000000000":  # NO-OP Handling
+            print(f"DEBUG: Reached NO-OP at PC {self.pc}. Stopping Execution.")
+            break  # Stop execution when encountering NO-OPs
 
-            if instruction == "0000000000000000":  # NO-OP
-                print(f"DEBUG: Reached NO-OP at PC {self.pc}. Skipping.")
-                self.pc += 1
-                continue
+        if not self.execute_instruction(instruction):
+            break  # Halt execution if an error occurs
 
-            if not self.execute_instruction(instruction):
-                break
-
-            self.pc += 1
+        self.pc += 1
 
 # Example test program: Load, Add, and Jump
 program = [
