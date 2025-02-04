@@ -1,68 +1,50 @@
-# compiler.py
+import sys
+import os
 
-def syntax_analysis(code):
-    # Convert the input code into an abstract syntax tree (AST)
-    ast = parse_code_to_ast(code)
-    return ast
+# Instruction mapping
+INSTRUCTION_SET = {
+    "PRINT": "0001"
+}
 
-def parse_code_to_ast(code):
-    # Parsing logic (simplified example)
-    # This example assumes code is a single statement for simplicity
-    statement = code.strip()
-    if statement.startswith("if_else"):
-        return {"type": "if_else", "condition": "condition", "then_block": "then_block", "else_block": "else_block"}
-    elif statement.startswith("while_loop"):
-        return {"type": "while_loop", "condition": "condition", "body": "body"}
-    elif statement.startswith("for_loop"):
-        return {"type": "for_loop", "init": "init", "condition": "condition", "increment": "increment", "body": "body"}
-    elif statement.startswith("try_catch"):
-        return {"type": "try_catch", "try_block": "try_block", "catch_block": "catch_block"}
-    elif statement.startswith("switch_case"):
-        return {"type": "switch_case", "value": "value", "cases": "cases"}
-    return {}
+def parse_line(line):
+    """ Parse a line of HuobzLang and convert it to machine code. """
+    line = line.strip()
+    
+    if line.startswith("PRINT "):
+        message = line[6:].strip().strip('"')
+        return INSTRUCTION_SET["PRINT"] + f" {message}"  # Simple encoding
 
-def semantic_analysis(ast):
-    # Validate the AST for semantic correctness
-    if ast.get("type") == "if_else":
-        if "condition" not in ast or "then_block" not in ast or "else_block" not in ast:
-            raise ValueError("Invalid if_else construct")
-    elif ast.get("type") == "while_loop":
-        if "condition" not in ast or "body" not in ast:
-            raise ValueError("Invalid while_loop construct")
-    elif ast.get("type") == "for_loop":
-        if "init" not in ast or "condition" not in ast or "increment" not in ast or "body" not in ast:
-            raise ValueError("Invalid for_loop construct")
-    elif ast.get("type") == "try_catch":
-        if "try_block" not in ast or "catch_block" not in ast:
-            raise ValueError("Invalid try_catch construct")
-    elif ast.get("type") == "switch_case":
-        if "value" not in ast or "cases" not in ast:
-            raise ValueError("Invalid switch_case construct")
-    return ast
+    return None  # Unknown instruction
 
-def code_generation(ast):
-    # Convert the validated AST into machine code
-    if ast.get("type") == "if_else":
-        return ["JUMP_IF_NOT condition then_block", "else_block"]
-    elif ast.get("type") == "while_loop":
-        return ["while_loop"]
-    elif ast.get("type") == "for_loop":
-        return ["for_loop"]
-    elif ast.get("type") == "try_catch":
-        return ["try_block", "CATCH", "catch_block"]
-    elif ast.get("type") == "switch_case":
-        return ["switch_case"]
-    return []
+def compile_file(input_path, output_path):
+    """ Compile a HuobzLang source file into machine code. """
+    compiled_code = []
+    
+    with open(input_path, "r") as f:
+        lines = f.readlines()
+    
+    for line in lines:
+        compiled_line = parse_line(line)
+        if compiled_line:
+            compiled_code.append(compiled_line)
+    
+    if compiled_code:
+        with open(output_path, "w") as f:
+            f.write("\n".join(compiled_code))
+        print(f"Compilation successful: {output_path}")
+    else:
+        print(f"ERROR: No valid instructions in {input_path}")
 
-def compile_huobzlang(code):
-    ast = syntax_analysis(code)
-    validated_ast = semantic_analysis(ast)
-    machine_code = code_generation(validated_ast)
-    return machine_code
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python3 compiler.py <source_file>")
+        sys.exit(1)
 
-# Example usage
-code = """
-if_else(condition, then_block, else_block)
-"""
-machine_code = compile_huobzlang(code)
-print(machine_code)
+    input_file = sys.argv[1]
+    output_file = input_file.replace(".hl", ".mc")  # Machine Code file
+
+    if not os.path.exists(input_file):
+        print(f"ERROR: File {input_file} does not exist.")
+        sys.exit(1)
+
+    compile_file(input_file, output_file)
