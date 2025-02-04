@@ -1,0 +1,22 @@
+~/HuobzLang/core_features/high_level_constructs.huobz
+
+# High-Level Constructs for HuobzLang
+
+def if_else(condition, then_block, else_block):
+    if condition:
+        then_block()
+    else:
+        else_block()
+
+def while_loop(condition, body):
+    while condition:
+        body()
+
+def define_function(name, params, body):
+    functions[name] = (params, body)
+
+def call_function(name, args):
+    params, body = functions[name]
+    for param, arg in zip(params, args):
+        locals()[param] = arg
+    body()
