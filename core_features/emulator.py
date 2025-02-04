@@ -2,102 +2,38 @@ import sys
 
 class HuobzEmulator:
     def __init__(self):
-        self.registers = [0] * 16  # 16 general-purpose registers
-        self.memory = ["0000000000000000"] * 65536  # 64K memory space (initialized with NO-OPs)
+        self.memory = ["0000000000000000"] * 65536  # Memory (16-bit slots)
         self.pc = 0  # Program Counter
-        self.executed_addresses = set()  # Track executed instructions for loop detection
+        self.output_buffer = ""  # Store output for PRINT
 
-    def load_program(self, program):
-        """Load a program (list of 16-bit binary instructions) into memory."""
-        for i, instruction in enumerate(program):
-            self.memory[i] = instruction
+    def load_program(self, program_path):
+        """Load binary program into memory."""
+        try:
+            with open(program_path, "r") as f:
+                lines = f.readlines()
+            self.memory[:len(lines)] = [line.strip() for line in lines]
+        except FileNotFoundError:
+            print(f"ERROR: File {program_path} not found.")
+            sys.exit(1)
 
     def execute_instruction(self, instruction):
         """Decode and execute a 16-bit instruction."""
         if len(instruction) != 16:
-            print(f"ERROR: Invalid instruction length {len(instruction)} at PC {self.pc}. Halting execution.")
+            print(f"ERROR: Invalid instruction length -> {instruction}")
             return False
 
         opcode = instruction[:4]
-        operands = instruction[4:]
+        operand = instruction[4:]
 
-        def get_register(value):
-            reg = int(value, 2)
-            if 0 <= reg < 16:
-                return reg
-            print(f"ERROR: Invalid register index {reg}. Must be between 0-15.")
-            return None
-
-        if opcode == "0001":  # LOAD
-            reg = get_register(operands[:4])
-            value = int(operands[4:], 2)
-            if reg is not None:
-                self.registers[reg] = value
-                print(f"LOAD: R{reg} = {value}")
-
-        elif opcode == "0010":  # STORE
-            reg = get_register(operands[:4])
-            addr = int(operands[4:], 2)
-            if reg is not None and 0 <= addr < len(self.memory):
-                self.memory[addr] = f"{self.registers[reg]:016b}"
-                print(f"STORE: Mem[{addr}] = R{reg} ({self.registers[reg]})")
-
-        elif opcode == "0011":  # ADD
-            reg1 = get_register(operands[:4])
-            reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
-                self.registers[reg1] += self.registers[reg2]
-                print(f"ADD: R{reg1} += R{reg2} ({self.registers[reg1]})")
-
-        elif opcode == "0100":  # SUB
-            reg1 = get_register(operands[:4])
-            reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
-                self.registers[reg1] -= self.registers[reg2]
-                print(f"SUB: R{reg1} -= R{reg2} ({self.registers[reg1]})")
-
-        elif opcode == "0101":  # MUL
-            reg1 = get_register(operands[:4])
-            reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
-                self.registers[reg1] *= self.registers[reg2]
-                print(f"MUL: R{reg1} *= R{reg2} ({self.registers[reg1]})")
-
-        elif opcode == "0110":  # DIV
-            reg1 = get_register(operands[:4])
-            reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
-                if self.registers[reg2] != 0:
-                    self.registers[reg1] //= self.registers[reg2]
-                    print(f"DIV: R{reg1} /= R{reg2} ({self.registers[reg1]})")
-                else:
-                    print("ERROR: Division by zero. Halting execution.")
-                    return False
-
-        elif opcode == "1000":  # JUMP
-            addr = int(operands, 2)
-            if 0 <= addr < len(self.memory):
-                print(f"JMP: Jumping to {addr}")
-                self.pc = addr - 1  # -1 to compensate for increment in run()
+        if opcode == "1110":  # PRINT Instruction
+            char_code = int(operand, 2)
+            if char_code == 0:  # PRINT end signal
+                print(self.output_buffer)  # Print stored output
+                self.output_buffer = ""  # Reset buffer
             else:
-                print(f"ERROR: Invalid jump address {addr}. Halting execution.")
-                return False
+                self.output_buffer += chr(char_code)
 
-        elif opcode == "1001":  # JUMP IF ZERO
-            reg = get_register(operands[:4])
-            addr = int(operands[4:], 2)
-            if reg is not None and self.registers[reg] == 0:
-                print(f"JMPZ: Jumping to {addr} because R{reg} = 0")
-                self.pc = addr - 1
-
-        elif opcode == "1010":  # JUMP IF NOT ZERO
-            reg = get_register(operands[:4])
-            addr = int(operands[4:], 2)
-            if reg is not None and self.registers[reg] != 0:
-                print(f"JMPNZ: Jumping to {addr} because R{reg} = {self.registers[reg]}")
-                self.pc = addr - 1
-
-        elif opcode == "1111":  # HALT
+        elif opcode == "1111":  # HALT Execution
             print("DEBUG: Execution Terminated.")
             return False
 
@@ -108,30 +44,25 @@ class HuobzEmulator:
         return True
 
     def run(self):
-    """Run the emulator, executing instructions sequentially."""
-    while self.pc < len(self.memory):
-        instruction = self.memory[self.pc]
+        """Run the emulator and execute instructions sequentially."""
+        while self.pc < len(self.memory):
+            instruction = self.memory[self.pc]
 
-        if instruction == "0000000000000000":  # NO-OP Handling
-            print(f"DEBUG: Reached NO-OP at PC {self.pc}. Stopping Execution.")
-            break  # Stop execution when encountering NO-OPs
+            if instruction == "0000000000000000":
+                self.pc += 1
+                continue  # Skip NO-OP
 
-        if not self.execute_instruction(instruction):
-            break  # Halt execution if an error occurs
+            if not self.execute_instruction(instruction):
+                break
 
-        self.pc += 1
+            self.pc += 1
 
-# Example test program: Load, Add, and Jump
-program = [
-    "0001000100000010",  # LOAD R1, 2
-    "0001001000000011",  # LOAD R2, 3
-    "0011000100100000",  # ADD R1, R2
-    "1000000000000101",  # JMP 5
-    "1111000000000000",  # HALT
-]
-
-# Run the emulator
+# Run the emulator with a compiled machine code file
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python3 emulator.py <machine_code_file>")
+        sys.exit(1)
+
     emulator = HuobzEmulator()
-    emulator.load_program(program)
+    emulator.load_program(sys.argv[1])
     emulator.run()
