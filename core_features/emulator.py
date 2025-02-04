@@ -1,129 +1,136 @@
-
-
-
-
-
-
-
 class HuobzEmulator:
     def __init__(self):
-        self.memory = [0] * 65536  # 64KB memory
-        self.registers = [0] * 16  # 16 registers (R0 - R15)
+        self.registers = [0] * 16  # 16 general-purpose registers
+        self.memory = [0] * 65536   # 64KB memory
         self.pc = 0  # Program Counter
-        self.halted = False
-        self.visited_addresses = set()  # Track visited PC addresses for loop detection
+        self.executed_instructions = set()  # Track executed instructions to detect infinite loops
 
     def load_program(self, program):
-        """ Load the program (list of 16-bit instructions) into memory """
-        for i, instruction in enumerate(program):
-            self.memory[i] = instruction
+        """ Load a binary program into memory """
+        self.memory[:len(program)] = program
 
     def execute_instruction(self, instruction):
-        """ Decode and execute a single instruction """
-        instruction = f"{instruction:016b}"  # Convert to 16-bit binary
-        opcode, operands = instruction[:4], instruction[4:]
+        """ Decode and execute an instruction """
+        instruction = f"{instruction:016b}"  # Ensure 16-bit binary format
+        opcode = instruction[:4]  # First 4 bits define the operation
+        operands = instruction[4:]  # Remaining 12 bits are operands
 
-        def get_register(bits):
-            """ Convert binary to register index, ensuring it's within range """
-            reg = int(bits, 2)
-            if 0 <= reg < len(self.registers):
-                return reg
-            else:
+        # Register extraction function
+        def get_register(value):
+            reg = int(value, 2)
+            if reg < 0 or reg > 15:
                 print(f"ERROR: Invalid register index {reg}. Must be between 0-15.")
-                return None
+                return None  # Avoid processing invalid registers
+            return reg
 
-        if opcode == "0001":  # LOAD: Load immediate value into register
+        # ALU Operations
+        if opcode == "0001":  # LOAD (R, Immediate)
             reg = get_register(operands[:4])
             value = int(operands[4:], 2)
             if reg is not None:
                 self.registers[reg] = value
                 print(f"LOAD: R{reg} = {value}")
 
-        elif opcode == "0010":  # STORE: Store register value into memory
-            reg = get_register(operands[:4])
-            address = int(operands[4:], 2)
-            if reg is not None:
-                self.memory[address] = self.registers[reg]
-                print(f"STORE: Mem[{address}] = R{reg} ({self.registers[reg]})")
-
-        elif opcode == "0011":  # ADD: Register addition
+        elif opcode == "0010":  # ADD (R1 = R1 + R2)
             reg1 = get_register(operands[:4])
             reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
+            if None not in (reg1, reg2):
                 self.registers[reg1] += self.registers[reg2]
                 print(f"ADD: R{reg1} += R{reg2} ({self.registers[reg1]})")
 
-        elif opcode == "0100":  # SUB: Register subtraction
+        elif opcode == "0011":  # SUB (R1 = R1 - R2)
             reg1 = get_register(operands[:4])
             reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
+            if None not in (reg1, reg2):
                 self.registers[reg1] -= self.registers[reg2]
                 print(f"SUB: R{reg1} -= R{reg2} ({self.registers[reg1]})")
 
-        elif opcode == "0101":  # MUL: Register multiplication
+        elif opcode == "0100":  # MUL (R1 = R1 * R2)
             reg1 = get_register(operands[:4])
             reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
+            if None not in (reg1, reg2):
                 self.registers[reg1] *= self.registers[reg2]
                 print(f"MUL: R{reg1} *= R{reg2} ({self.registers[reg1]})")
 
-        elif opcode == "0110":  # DIV: Register division
+        elif opcode == "0101":  # DIV (R1 = R1 / R2)
             reg1 = get_register(operands[:4])
             reg2 = get_register(operands[4:])
-            if reg1 is not None and reg2 is not None:
-                if self.registers[reg2] != 0:
-                    self.registers[reg1] //= self.registers[reg2]
-                    print(f"DIV: R{reg1} /= R{reg2} ({self.registers[reg1]})")
-                else:
-                    print("ERROR: Division by zero. Halting execution.")
-                    return False
+            if None not in (reg1, reg2) and self.registers[reg2] != 0:
+                self.registers[reg1] //= self.registers[reg2]
+                print(f"DIV: R{reg1} /= R{reg2} ({self.registers[reg1]})")
+            else:
+                print(f"ERROR: Division by zero in R{reg2}.")
 
-        elif opcode == "1010":  # JMP: Unconditional jump
-            jump_address = int(operands, 2)
-            if jump_address in self.visited_addresses:
-                print(f"ERROR: Infinite loop detected at PC {jump_address}. Halting execution.")
-                return False
-            self.visited_addresses.add(jump_address)
-            print(f"JMP: Jumping to {jump_address}")
-            self.pc = jump_address - 1  # Adjust PC
-
-        elif opcode == "1011":  # JMPZ: Jump if Zero
+        elif opcode == "0110":  # STORE (Mem[Addr] = R)
             reg = get_register(operands[:4])
-            jump_address = int(operands[4:], 2)
-            if reg is not None and self.registers[reg] == 0:
-                print(f"JMPZ: Jumping to {jump_address} because R{reg} = 0")
-                self.pc = jump_address - 1
+            addr = int(operands[4:], 2)
+            if reg is not None:
+                self.memory[addr] = self.registers[reg]
+                print(f"STORE: Mem[{addr}] = R{reg} ({self.registers[reg]})")
 
-        elif opcode == "1111":  # HALT: Stop execution
+        elif opcode == "0111":  # LOAD FROM MEMORY (R = Mem[Addr])
+            reg = get_register(operands[:4])
+            addr = int(operands[4:], 2)
+            if reg is not None:
+                self.registers[reg] = self.memory[addr]
+                print(f"LOAD_MEM: R{reg} = Mem[{addr}] ({self.memory[addr]})")
+
+        # Control Flow Operations
+        elif opcode == "1000":  # JMP (Jump to address)
+            target_pc = int(operands, 2)
+            if 0 <= target_pc < len(self.memory):
+                print(f"JMP: Jumping to {target_pc}")
+                self.pc = target_pc
+                return  # Skip PC increment
+
+        elif opcode == "1001":  # JMPZ (Jump if R0 == 0)
+            target_pc = int(operands, 2)
+            if self.registers[0] == 0 and 0 <= target_pc < len(self.memory):
+                print(f"JMPZ: Jumping to {target_pc} because R0 = 0")
+                self.pc = target_pc
+                return  # Skip PC increment
+
+        elif opcode == "1010":  # JNZ (Jump if R0 != 0)
+            target_pc = int(operands, 2)
+            if self.registers[0] != 0 and 0 <= target_pc < len(self.memory):
+                print(f"JNZ: Jumping to {target_pc} because R0 != 0")
+                self.pc = target_pc
+                return  # Skip PC increment
+
+        elif opcode == "1111":  # HALT
             print("DEBUG: Execution Terminated.")
-            self.halted = True
-            return False
+            return False  # Stop execution
 
         else:
             print(f"ERROR: Unrecognized opcode {opcode}. Halting execution.")
-            return False
+            return False  # Stop execution
 
+        self.pc += 1  # Move to next instruction
         return True
 
     def run(self):
-        """ Run the loaded program until HALT """
-        while not self.halted and self.pc < len(self.memory):
+        """ Runs the program loaded into memory """
+        while self.pc < len(self.memory):
+            if self.pc in self.executed_instructions:
+                print(f"ERROR: Infinite loop detected at PC {self.pc}. Halting execution.")
+                break  # Prevent infinite loop
+
+            self.executed_instructions.add(self.pc)
+
             instruction = self.memory[self.pc]
             if not self.execute_instruction(instruction):
                 break
-            self.pc += 1  # Move to the next instruction
 
-# Example program with fixed register indices
+# Sample Test Program (Binary Encoded Instructions)
+program = [
+    0b0001000100000010,  # LOAD R1, 2
+    0b0001001000000011,  # LOAD R2, 3
+    0b0010000100100000,  # ADD R1, R2
+    0b1000000000000101,  # JMP 5 (Infinite loop protection check)
+    0b1111000000000000   # HALT
+]
+
 if __name__ == "__main__":
-    program = [
-        0b0001000100000010,  # LOAD R1, 2
-        0b0001001000000011,  # LOAD R2, 3
-        0b0101000100100000,  # MUL R1, R2
-        0b0110000100100000,  # DIV R1, R2
-        0b1010000000000101,  # JMP 5
-        0b1111000000000000,  # HALT
-    ]
-    
     emulator = HuobzEmulator()
     emulator.load_program(program)
     emulator.run()
