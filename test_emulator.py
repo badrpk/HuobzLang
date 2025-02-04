@@ -2,7 +2,7 @@ import sys
 import os
 import unittest
 
-# Fix import path issue
+# Fix import path by adding `core_features` to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../core_features')))
 
 # Now import the emulator correctly
