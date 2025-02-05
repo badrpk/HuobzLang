@@ -35,9 +35,11 @@ def vector_add(dest, src1, src2):
 
     # Ensure registers contain lists (vectors)
     if not isinstance(registers[src1], list):
+        print(f"⚠️ WARNING: Register {src1} does not contain a vector. Initializing to [0, 0, 0, 0]")
         registers[src1] = [0, 0, 0, 0]  # Initialize as zero vector
 
     if not isinstance(registers[src2], list):
+        print(f"⚠️ WARNING: Register {src2} does not contain a vector. Initializing to [0, 0, 0, 0]")
         registers[src2] = [0, 0, 0, 0]  # Initialize as zero vector
 
     # Perform vector addition
@@ -51,58 +53,48 @@ def execute_program(program):
 
     while pc < len(program):
         instruction = program[pc].strip()
-
-        # DEBUG: Show current execution step
         print(f"🔹 Executing Instruction: {instruction}")
-        print(f"🛠 DEBUG: Current Program Counter (PC) = {pc}")
 
-        # Check for 5-bit opcode instructions first
-        if instruction.startswith("11101"):  # VECTOR_ADD Opcode Fix
-            operands = instruction[5:]
-            print(f"🛠 DEBUG: Processing VECTOR_ADD with raw operands: {operands}")
+        # Identify if this is a GPU instruction (VECTOR_ADD)
+        if instruction[:5] in ["11101", "11100"]:  # VECTOR_ADD, VECTOR_MULTIPLY, etc.
+            opcode = instruction[:5]  # First 5 bits for GPU instructions
+            operands = instruction[5:]  # The rest are operands
+        else:
+            opcode = instruction[:4]  # First 4 bits for normal instructions
+            operands = instruction[4:]  # The rest are operands
 
-            if len(operands) < 6:
-                print(f"⚠️ ERROR: VECTOR_ADD requires three valid register operands. Received: {operands}")
-                return
+        print(f"🛠 DEBUG: Processing {opcode} with operands {operands}")
 
-            try:
-                dest = f"R{int(operands[:2], 2)}"
-                src1 = f"R{int(operands[2:4], 2)}"
-                src2 = f"R{int(operands[4:6], 2)}"
-
-                print(f"🛠 DEBUG: Parsed VECTOR_ADD operands -> dest={dest}, src1={src1}, src2={src2}")
-
-                vector_add(dest, src1, src2)
-            except ValueError as e:
-                print(f"⚠️ ERROR: Invalid operand format for VECTOR_ADD: {e}")
-                return
-
-            pc += 1
-            continue  # Skip the rest of the loop
-
-        # Handle 4-bit opcodes
-        opcode = instruction[:4]
-        operands = instruction[4:]
-
+        # Execute based on opcode
         if opcode == "0000":  # LOAD
-            reg = f"R{int(operands[:2], 2)}"
-            value = int(operands[2:], 2) if operands[2:] else 0
-            load(reg, value)
-
+            reg = operands[:2]
+            value_part = operands[2:]
+            if gpu_mode:
+                # Parse as vector: 4 elements, 8 bits each
+                elements = []
+                for i in range(0, 32, 8):
+                    chunk = value_part[i:i+8] if i+8 <= len(value_part) else '00000000'
+                    elements.append(int(chunk, 2))
+                # Ensure exactly 4 elements, truncate or pad with 0 if needed
+                elements = elements[:4] + [0]*(4 - len(elements[:4]))
+                load(reg, elements)
+            else:
+                # Scalar load (default)
+                value = int(value_part, 2) if value_part else 0
+                load(reg, value)
         elif opcode == "0010":  # ADD
-            add(f"R{int(operands[:2], 2)}", f"R{int(operands[2:4], 2)}", f"R{int(operands[4:6], 2)}")
-
+            add(operands[:2], operands[2:4], operands[4:6])
         elif opcode == "0001":  # PRINT
-            print_reg(f"R{int(operands[:2], 2)}")
-
+            print_reg(operands[:2])
         elif opcode == "1110":  # HALT
             halt()
             break
-
-        elif opcode == "1100":  # GPU KERNEL CALL
-            print("⚡ Executing GPU Kernel")
-            gpu_mode = True  # Enter GPU mode for subsequent instructions
-
+        elif opcode == "11101":  # VECTOR_ADD
+            # Perform GPU operation like VECTOR_ADD
+            src1 = f"R{int(operands[:2], 2)}"
+            src2 = f"R{int(operands[2:4], 2)}"
+            dest = f"R{int(operands[4:], 2)}"
+            vector_add(dest, src1, src2)
         else:
             print(f"⚠️ ERROR: Unknown opcode {opcode}")
 
