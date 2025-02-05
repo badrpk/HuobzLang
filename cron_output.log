@@ -198,3 +198,30 @@ Please make sure you have the correct access rights
 and the repository exists.
 ✅ HuobzLang repository updated successfully!
 warning: Empty last update token.
+warning: adding embedded git repository: HuobzLang
+hint: You've added another git repository inside your current repository.
+hint: Clones of the outer repository will not contain the contents of
+hint: the embedded repository and will not know how to obtain it.
+hint: If you meant to add a submodule, use:
+hint: 
+hint: 	git submodule add <url> HuobzLang
+hint: 
+hint: If you added this path by mistake, you can remove it from the
+hint: index with:
+hint: 
+hint: 	git rm --cached HuobzLang
+hint: 
+hint: See "git help submodule" for more information.
+warning: Empty last update token.
+[main b3c5e82] Auto-update: 2025-02-05 10:01:44
+ 3 files changed, 2 insertions(+)
+ create mode 100644 .README.md.swp
+ create mode 160000 HuobzLang
+git@github.com: Permission denied (publickey).
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+✅ HuobzLang repository updated successfully!
+warning: Empty last update token.
+warning: Empty last update token.
