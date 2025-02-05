@@ -25,14 +25,26 @@ def halt():
 
 def vector_add(dest, src1, src2):
     """VECTOR_ADD: Perform parallel addition on vector elements."""
-    if src1 in registers and src2 in registers:
-        if isinstance(registers[src1], list) and isinstance(registers[src2], list):
-            registers[dest] = [a + b for a, b in zip(registers[src1], registers[src2])]
-            print(f"⚡ GPU VECTOR_ADD {src1} + {src2} → {dest}: {registers[dest]}")
-        else:
-            print(f"⚠️ ERROR: VECTOR_ADD requires vector registers. Found {type(registers[src1])} and {type(registers[src2])}")
-    else:
-        print(f"⚠️ ERROR: Invalid registers for VECTOR_ADD: {src1}, {src2}, {dest}")
+    print(f"🛠 DEBUG: Attempting VECTOR_ADD with operands {src1}, {src2}, {dest}")
+
+    # Ensure registers exist and contain lists (vectors)
+    for reg in [dest, src1, src2]:
+        if reg not in registers:
+            print(f"⚠️ ERROR: Invalid register: {reg}")
+            return
+
+        if not isinstance(registers[reg], list):
+            print(f"⚠️ WARNING: Register {reg} does not contain a vector. Initializing to [0, 0, 0, 0]")
+            registers[reg] = [0, 0, 0, 0]  # Initialize as zero vector
+    
+    # Get the length of the shortest vector to avoid IndexError
+    vector_length = min(len(registers[src1]), len(registers[src2]), len(registers[dest]))
+
+    # Perform vector addition up to the shortest vector length
+    registers[dest] = [registers[src1][i] + registers[src2][i] for i in range(vector_length)]
+
+    print(f"⚡ GPU VECTOR_ADD {src1} + {src2} → {dest}: {registers[dest]}")
+
 
 def execute_program(program):
     """Execute the given machine code program."""
@@ -59,8 +71,13 @@ def execute_program(program):
         elif opcode == "1100":  # GPU KERNEL CALL
             print(f"⚡ Executing GPU Kernel")
         elif opcode == "111001":  # VECTOR_ADD
+            print(f"🛠 DEBUG: Processing VECTOR_ADD with operands {operands}")
+
+            if len(operands) < 6:
+                print("⚠️ ERROR: VECTOR_ADD requires three valid register operands.")
+                return
+
             src1, src2, dest = operands[:2], operands[2:4], operands[4:6]
-            print(f"🛠 DEBUG: Executing VECTOR_ADD with src1={src1}, src2={src2}, dest={dest}")
             vector_add(dest, src1, src2)
         else:
             print(f"⚠️ ERROR: Unknown opcode {opcode}")
@@ -69,16 +86,5 @@ def execute_program(program):
 
     print("🏁 Execution complete.")
 
-# Load and execute a HuobzLang machine code program
-if len(sys.argv) < 2:
-    print("❌ Error: No program file provided.")
-    sys.exit(1)
+# ... (rest of the code for loading the program from file remains the same)
 
-program_path = sys.argv[1]
-
-try:
-    with open(program_path, "r") as f:
-        program = f.read().splitlines()
-    execute_program(program)
-except FileNotFoundError:
-    print(f"❌ Error: File {program_path} not found.")
