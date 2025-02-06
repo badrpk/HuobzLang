@@ -55,33 +55,32 @@ def execute_program(program):
         instruction = program[pc].strip()
         print(f"🔹 Executing Instruction: {instruction}")
 
-        # Identify if this is a GPU instruction (VECTOR_ADD)
-        if instruction[:5] in ["11101", "11100"]:  # VECTOR_ADD, VECTOR_MULTIPLY, etc.
-            opcode = instruction[:5]  # First 5 bits for GPU instructions
-            operands = instruction[5:]  # The rest are operands
-        else:
-            opcode = instruction[:4]  # First 4 bits for normal instructions
-            operands = instruction[4:]  # The rest are operands
+        # Identify the opcode
+        if instruction.startswith("111001"):  # VECTOR_ADD
+            operands = instruction[6:]
+            print(f"🛠 DEBUG: Processing VECTOR_ADD with operands {operands}")
 
+            # Ensure we have enough operands
+            if len(operands) < 6:
+                print("⚠️ ERROR: VECTOR_ADD requires three valid register operands.")
+                return
+
+            src1 = operands[:2]
+            src2 = operands[2:4]
+            dest = operands[4:6]
+            vector_add(dest, src1, src2)
+            pc += 1
+            continue  # Skip the rest of the loop for GPU instruction
+
+        # Handle 4-bit opcodes (regular instructions)
+        opcode = instruction[:4]
+        operands = instruction[4:]
         print(f"🛠 DEBUG: Processing {opcode} with operands {operands}")
 
-        # Execute based on opcode
         if opcode == "0000":  # LOAD
             reg = operands[:2]
             value_part = operands[2:]
-            if gpu_mode:
-                # Parse as vector: 4 elements, 8 bits each
-                elements = []
-                for i in range(0, 32, 8):
-                    chunk = value_part[i:i+8] if i+8 <= len(value_part) else '00000000'
-                    elements.append(int(chunk, 2))
-                # Ensure exactly 4 elements, truncate or pad with 0 if needed
-                elements = elements[:4] + [0]*(4 - len(elements[:4]))
-                load(reg, elements)
-            else:
-                # Scalar load (default)
-                value = int(value_part, 2) if value_part else 0
-                load(reg, value)
+            load(reg, int(value_part, 2))
         elif opcode == "0010":  # ADD
             add(operands[:2], operands[2:4], operands[4:6])
         elif opcode == "0001":  # PRINT
@@ -89,12 +88,6 @@ def execute_program(program):
         elif opcode == "1110":  # HALT
             halt()
             break
-        elif opcode == "11101":  # VECTOR_ADD
-            # Perform GPU operation like VECTOR_ADD
-            src1 = f"R{int(operands[:2], 2)}"
-            src2 = f"R{int(operands[2:4], 2)}"
-            dest = f"R{int(operands[4:], 2)}"
-            vector_add(dest, src1, src2)
         else:
             print(f"⚠️ ERROR: Unknown opcode {opcode}")
 
