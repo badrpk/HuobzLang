@@ -2,7 +2,6 @@ import sys
 
 # Registers and Memory
 registers = {f"R{i}": 0 for i in range(16)}  # 16 General-Purpose Registers
-memory = {}
 pc = 0  # Program Counter
 
 def load(reg, value):
@@ -25,28 +24,6 @@ def mov(dest, value):
     registers[dest] = value
     print(f"📤 {dest} ← {value}")
 
-def mul(dest, src1, src2):
-    """MUL instruction: Multiply values of two registers and store in a third register."""
-    registers[dest] = registers[src1] * registers[src2]
-    print(f"✖️ {dest} = {registers[src1]} * {registers[src2]} → {registers[dest]}")
-
-def div(dest, src1, src2):
-    """DIV instruction: Divide values of two registers and store in a third register."""
-    if registers[src2] == 0:
-        print("⚠️ ERROR: Division by zero")
-        return
-    registers[dest] = registers[src1] // registers[src2]
-    print(f"➗ {dest} = {registers[src1]} / {registers[src2]} → {registers[dest]}")
-
-def cmp(src1, src2):
-    """CMP instruction: Compare two registers."""
-    if registers[src1] == registers[src2]:
-        print("🔍 CMP: Registers are equal.")
-    elif registers[src1] < registers[src2]:
-        print("🔍 CMP: Register1 is less than Register2.")
-    else:
-        print("🔍 CMP: Register1 is greater than Register2.")
-
 def print_reg(reg):
     """PRINT instruction: Output the value stored in a register."""
     print(f"💡 Output: {registers[reg]}")
@@ -55,28 +32,6 @@ def halt():
     """HALT instruction: Stop execution."""
     print("🛑 HALT encountered - Stopping execution")
 
-def vector_add(dest, src1, src2):
-    """VECTOR_ADD: Perform parallel addition on vector elements."""
-    print(f"🛠 DEBUG: Attempting VECTOR_ADD with src1={src1}, src2={src2}, dest={dest}")
-
-    # Ensure registers exist
-    if src1 not in registers or src2 not in registers:
-        print(f"⚠️ ERROR: VECTOR_ADD invalid registers: {src1}, {src2}")
-        return
-
-    # Ensure registers contain lists (vectors)
-    if not isinstance(registers[src1], list):
-        print(f"⚠️ WARNING: Register {src1} does not contain a vector. Initializing to [0, 0, 0, 0]")
-        registers[src1] = [0, 0, 0, 0]  # Initialize as zero vector
-
-    if not isinstance(registers[src2], list):
-        print(f"⚠️ WARNING: Register {src2} does not contain a vector. Initializing to [0, 0, 0, 0]")
-        registers[src2] = [0, 0, 0, 0]  # Initialize as zero vector
-
-    # Perform vector addition
-    registers[dest] = [a + b for a, b in zip(registers[src1], registers[src2])]
-    print(f"⚡ GPU VECTOR_ADD {src1} + {src2} → {dest}: {registers[dest]}")
-
 def execute_program(program):
     """Execute the given machine code program."""
     global pc
@@ -84,45 +39,31 @@ def execute_program(program):
 
     while pc < len(program):
         instruction = program[pc]
-        opcode = instruction[:4]  # First 4 bits = opcode
-        operands = instruction[4:]  # Remaining bits = operands
-
         print(f"🔹 Executing Instruction: {instruction}")
+        parts = instruction.split()
 
-        if opcode == "0000":  # LOAD
-            reg, value = operands[:2], int(operands[2:], 2)
-            load(reg, value)
-        elif opcode == "0010":  # ADD
-            add(operands[:2], operands[2:4], operands[4:])
-        elif opcode == "0011":  # SUB
-            sub(operands[:2], operands[2:4], operands[4:])
-        elif opcode == "0100":  # MOV
-            mov(operands[:2], int(operands[2:], 2))
-        elif opcode == "0110":  # MUL
-            mul(operands[:2], operands[2:4], operands[4:])
-        elif opcode == "0111":  # DIV
-            div(operands[:2], operands[2:4], operands[4:])
-        elif opcode == "1000":  # CMP
-            cmp(operands[:2], operands[2:4])
-        elif opcode == "0001":  # PRINT
-            print_reg(operands[:2])
-        elif opcode == "1110":  # HALT
+        if len(parts) == 0:
+            continue
+
+        cmd = parts[0]
+        operands = parts[1:]
+
+        if cmd == "ADD":
+            # R0 = R1 + R2
+            add(operands[0], operands[1], operands[2])
+        elif cmd == "MOV":
+            # MOV R3, R4
+            mov(operands[0], int(operands[1]))
+        elif cmd == "SUB":
+            # R5 = R6 - R7
+            sub(operands[0], operands[1], operands[2])
+        elif cmd == "PRINT":
+            print_reg(operands[0])
+        elif cmd == "HALT":
             halt()
             break
-        elif opcode == "1100":  # GPU KERNEL CALL
-            print(f"⚡ Executing GPU Kernel")
-        elif opcode == "111001":  # VECTOR_ADD
-            print(f"🛠 DEBUG: Processing VECTOR_ADD with operands {operands}")
-
-            # Ensure we have enough operands
-            if len(operands) < 6:
-                print("⚠️ ERROR: VECTOR_ADD requires three valid register operands.")
-                return
-
-            src1, src2, dest = operands[:2], operands[2:4], operands[4:6]
-            vector_add(dest, src1, src2)
         else:
-            print(f"⚠️ ERROR: Unknown opcode {opcode}")
+            print(f"⚠️ ERROR: Unknown opcode {cmd}")
 
         pc += 1  # Move to the next instruction
 
