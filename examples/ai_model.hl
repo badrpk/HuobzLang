@@ -1,1 +1,0 @@
-AI_MODEL {input=images, output=labels}
